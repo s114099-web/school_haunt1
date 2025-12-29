@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>學校靈異逃脫</title>
+    <style>
+        /* 1. CSS 樣式 */
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #000; /* 全黑背景 */
+            color: #ccc;
+            font-family: '微軟正黑體', 'Arial', sans-serif;
+            user-select: none;
+        }
+        canvas {
+            border: 1px solid #444;
+            background-color: #222;
+            cursor: crosshair; /* 提示玩家可以點擊 */
+        }
+        #info {
+            margin-top: 15px;
+            font-size: 1.1em;
+            color: #e0e0e0;
+        }
+        .controls {
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
+        .controls span {
+            color: #f39c12; /* 突顯按鍵 */
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>👻 學校靈異逃脫 👻</h1>
+    <div class="controls">
+        移動：<span>W A S D</span> | 攻擊/擊退：<span>滑鼠左鍵點擊</span>
+    </div>
+
+    <canvas id="gameCanvas" width="800" height="560"></canvas>
+
+    <div id="info">故事：你被困在廢棄校園，有鬼魂在追你！逃到綠色出口！</div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const TILE_SIZE = 40; // 每個方塊的大小
+        const PLAYER_SPEED = 3;
+        const VIEW_RADIUS = TILE_SIZE * 4.5; // 玩家的視野範圍
+
+        // 學校地圖 (R=14, C=20)
+        // 1=牆壁/教室, 0=走廊, 2=玩家起點, 3=鬼魂起點, 4=出口(校門)
+        const MAP = [
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 1], // 校門在右側
+            [1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1],
+            [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], // 走廊
+            [1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1],
+            [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], // 走廊
+            [1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1],
+            [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            [1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1],
+            [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], // 走廊
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1],
+            [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], // 走廊
+            [1, 2, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], // 2=玩家起點, 3=鬼魂起點
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        ];
+        
+        // 尋找地圖上的起點
+        function findStart(type) {
+            for (let r = 0; r < MAP.length; r++) {
+                for (let c = 0; c < MAP[r].length; c++) {
+                    if (MAP[r][c] === type) {
+                        return { x: c * TILE_SIZE + TILE_SIZE / 2, y: r * TILE_SIZE + TILE_SIZE / 2 };
+                    }
+                }
+            }
+        }
+
+        let player = {
+            ...findStart(2),
+            width: TILE_SIZE * 0.5,
+            height: TILE_SIZE * 0.5,
+            color: 'cyan'
+        };
+
+        let ghost = {
+            ...findStart(3),
+            width: TILE_SIZE * 0.6,
+            height: TILE_SIZE * 0.6,
+            speed: 2.2, // 鬼魂速度
+            color: 'rgba(255, 0, 0, 0.7)', // 半透明紅色
+            isStunned: false, // 是否被擊退
+            stunTimer: 0
+        };
+
+        let keys = {};
+        let mouse = { x: 0, y: 0, clicked: false };
+        let gameActive = true;
+        let gameStatus = "PLAYING"; // PLAYING, WIN, LOSE
+
+        // --- 事件監聽器 (輸入) ---
+
+        document.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+            keys[e.key] = true;
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+            keys[e.key] = false;
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mouse.x = e.clientX - rect.left;
+            mouse.y = e.clientY - rect.top;
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (e.button === 0 && gameActive) { // 左鍵
+                mouse.clicked = true;
+            }
+        });
+
+        canvas.addEventListener('mouseup', (e) => {
+            if (e.button === 0) {
+                mouse.clicked = false;
+            }
+        });
+
+        // --- 繪圖函數 ---
+
+        // 繪製單個地圖方塊
+        function drawTile(c, r, tile) {
+            const x = c * TILE_SIZE;
+            const y = r * TILE_SIZE;
+            
+            if (tile === 1) {
+                // 牆壁/教室 (深灰色，模擬水泥牆)
+                ctx.fillStyle = '#444';
+                ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                ctx.strokeStyle = '#333';
+                ctx.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
+            } else if (tile === 4) {
+                // 出口 (綠色，校門)
+                ctx.fillStyle = '#27ae60';
+                ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                ctx.strokeStyle = '#2ecc71';
+                ctx.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
+            } else {
+                // 走廊 (淺灰色地板)
+                ctx.fillStyle = '#333';
+                ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+            }
+        }
+        
+        // 繪製所有地圖
+        function drawMap() {
+            for (let r = 0; r < MAP.length; r++) {
+                for (let c = 0; c < MAP[r].length; c++) {
+                    drawTile(c, r, MAP[r][c]);
+                }
+            }
+        }
+
+        // 繪製玩家
+        function drawPlayer() {
+            ctx.fillStyle = player.color;
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.width / 2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 繪製手電筒/視野範圍
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, VIEW_RADIUS, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // 繪製鬼魂
+        function drawGhost() {
+            // 鬼魂閃爍效果
+            ctx.fillStyle = ghost.isStunned ? 'rgba(255, 255, 255, 1.0)' : ghost.color;
+            
+            ctx.beginPath();
+            // 繪製鬼魂的半透明形狀
+            ctx.ellipse(ghost.x, ghost.y, ghost.width / 2, ghost.height / 1.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 繪製鬼臉
+            ctx.fillStyle = '#000';
+            ctx.fillRect(ghost.x - 5, ghost.y - 5, 2, 2);
+            ctx.fillRect(ghost.x + 3, ghost.y - 5, 2, 2);
+        }
+
+        // 黑暗遮罩 (核心恐怖效果)
+        function drawDarkness() {
+            // 創建一個覆蓋整個畫布的圓形漸變
+            const gradient = ctx.createRadialGradient(
+                player.x, player.y, VIEW_RADIUS * 0.5, // 內圈半徑 (較亮)
+                player.x, player.y, VIEW_RADIUS // 外圈半徑 (完全黑暗)
+            );
+            
+            // 顏色從中間的透明 (玩家位置) 漸變到外部的純黑
+            gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0.95)');
+
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // --- 遊戲邏輯函數 ---
+
+        // 檢查給定座標是否為牆壁 (1)
+        function isWall(x, y) {
+            const c = Math.floor(x / TILE_SIZE);
+            const r = Math.floor(y / TILE_SIZE);
+
+            if (r < 0 || r >= MAP.length || c < 0 || c >= MAP[0].length) {
+                return true;
+            }
+
+            return MAP[r][c] === 1;
+        }
+
+        // 檢查角色與牆壁的碰撞
+        function checkCollision(obj, nextX, nextY) {
+            const halfSize = obj.width / 2;
+            const points = [
+                { x: nextX - halfSize, y: nextY - halfSize }, // 左上
+                { x: nextX + halfSize, y: nextY - halfSize }, // 右上
+                { x: nextX - halfSize, y: nextY + halfSize }, // 左下
+                { x: nextX + halfSize, y: nextY + halfSize }  // 右下
+            ];
+
+            for (const point of points) {
+                if (isWall(point.x, point.y)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        // 更新玩家位置
+        function updatePlayer() {
+            let nextX = player.x;
+            let nextY = player.y;
+
+            if (keys['w'] || keys['ArrowUp']) nextY -= PLAYER_SPEED;
+            if (keys['s'] || keys['ArrowDown']) nextY += PLAYER_SPEED;
+            if (keys['a'] || keys['ArrowLeft']) nextX -= PLAYER_SPEED;
+            if (keys['d'] || keys['ArrowRight']) nextX += PLAYER_SPEED;
+
+            if (!checkCollision(player, nextX, player.y)) player.x = nextX;
+            if (!checkCollision(player, player.x, nextY)) player.y = nextY;
+            
+            // 檢查勝利
+            const exitTile = MAP[Math.floor(player.y / TILE_SIZE)][Math.floor(player.x / TILE_SIZE)];
+            if (exitTile === 4) {
+                gameStatus = "WIN";
+                gameActive = false;
+            }
+        }
+        
+        // 更新鬼魂位置 (追蹤邏輯)
+        function updateGhost() {
+            if (ghost.isStunned) {
+                ghost.stunTimer--;
+                if (ghost.stunTimer <= 0) {
+                    ghost.isStunned = false;
+                }
+                return; // 暈眩時不移動
+            }
+
+            // 計算鬼魂到玩家的方向
+            const dx = player.x - ghost.x;
+            const dy = player.y - ghost.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance > 1) {
+                const vx = (dx / distance) * ghost.speed;
+                const vy = (dy / distance) * ghost.speed;
+
+                let nextX = ghost.x + vx;
+                let nextY = ghost.y + vy;
+
+                // 簡易碰撞處理 (避免鬼穿牆，但鬼的追蹤不應被牆壁完全阻擋)
+                if (!isWall(nextX, ghost.y)) ghost.x = nextX;
+                if (!isWall(ghost.x, nextY)) ghost.y = nextY;
+                
+                // 如果兩個方向都撞牆，則嘗試繞過
+                if (isWall(nextX, ghost.y) && isWall(ghost.x, nextY)) {
+                     // 讓鬼魂隨機改變方向，模擬繞路
+                     if (Math.random() < 0.5) {
+                         ghost.x += ghost.speed;
+                     } else {
+                         ghost.y += ghost.speed;
+                     }
+                }
+            }
+
+            // 檢查鬼魂與玩家的接觸 (失敗條件)
+            if (distance < (player.width / 2 + ghost.width / 2) * 0.8) {
+                gameStatus = "LOSE";
+                gameActive = false;
+            }
+        }
+        
+        // 處理滑鼠攻擊
+        function handleAttack() {
+            if (mouse.clicked) {
+                const distance = Math.sqrt(
+                    (player.x - ghost.x) ** 2 + (player.y - ghost.y) ** 2
+                );
+
+                // 攻擊範圍檢查 (例如，只能在 100 像素內點擊到鬼魂)
+                if (distance < TILE_SIZE * 2) { 
+                    // 鬼魂被擊退 (Stun)
+                    ghost.isStunned = true;
+                    ghost.stunTimer = 60; // 60 幀 = 約 1 秒的暈眩時間
+                    
+                    // 擊退視覺效果：將鬼魂推離玩家
+                    const dx = ghost.x - player.x;
+                    const dy = ghost.y - player.y;
+                    const angle = Math.atan2(dy, dx);
+                    
+                    // 擊退距離
+                    ghost.x += Math.cos(angle) * TILE_SIZE * 2;
+                    ghost.y += Math.sin(angle) * TILE_SIZE * 2;
+                    
+                    // 確保擊退後鬼魂不會進入牆壁
+                    if (isWall(ghost.x, ghost.y)) {
+                        ghost.x = ghost.x - Math.cos(angle) * TILE_SIZE * 2;
+                        ghost.y = ghost.y - Math.sin(angle) * TILE_SIZE * 2;
+                    }
+                }
+            }
+        }
+
+
+        // 遊戲主循環
+        function gameLoop() {
+            // 清空畫布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 繪製地圖
+            drawMap();
+            
+            if (gameActive) {
+                // 更新和繪製
+                updatePlayer();
+                updateGhost();
+                handleAttack();
+                
+                drawPlayer();
+                drawGhost();
+                
+                // 黑暗遮罩必須在最後繪製，覆蓋所有內容
+                drawDarkness();
+
+            } else {
+                // 顯示遊戲結束畫面
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.font = '48px Arial';
+                ctx.textAlign = 'center';
+                
+                if (gameStatus === "WIN") {
+                    ctx.fillStyle = '#2ecc71';
+                    ctx.fillText('✅ 成功逃出校園！ ✅', canvas.width / 2, canvas.height / 2);
+                } else if (gameStatus === "LOSE") {
+                    ctx.fillStyle = 'red';
+                    ctx.fillText('💀 你被鬼魂抓住了... 💀', canvas.width / 2, canvas.height / 2);
+                    ctx.font = '24px Arial';
+                    ctx.fillText('刷新頁面重新開始', canvas.width / 2, canvas.height / 2 + 50);
+                }
+            }
+
+            // 循環調用
+            requestAnimationFrame(gameLoop);
+        }
+
+        // 啟動遊戲
+        gameLoop();
+    </script>
+
+</body>
+</html>
