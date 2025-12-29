@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>午夜迴廊：極簡恐怖體驗</title>
+    <style>
+        /* 1. 全域 CSS 設定 */
+        body {
+            background-color: #0a0a0a; /* 極深的背景 */
+            color: #d0d0d0; /* 略微褪色的文字 */
+            font-family: 'Courier New', Courier, monospace; /* 經典的遊戲/終端機字體 */
+            margin: 0;
+            overflow: hidden; /* 隱藏滾動條 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            cursor: url('data:image/x-icon;base64,AAABAAIAICAAAAAAAACoCAAAFgAAACgAAAAgAAAAIAAAAAEAIAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAEAACAAAAEAAAMAAAABAAAEAAAAAQAAAQAAAQAAAAAAAAAAAAAAEAAAAAAAAAABAAAAAAAAAAEAAAAAAAAAAQAAAAAAAAAABAAAAAAAAAAEAAAAAAAAAAQAAAAAAAAAAAAAAIAAAAAAAAAAQAADAAAACAAAAEAAAQAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'), auto; /* 自訂滑鼠游標 */
+            transition: background-color 2s ease-in-out; /* 背景顏色過渡 */
+        }
+
+        /* 2. 遊戲容器 */
+        #game-container {
+            width: 80%;
+            max-width: 800px;
+            text-align: center;
+            padding: 20px;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.5); /* 輕微的陰影 */
+        }
+
+        /* 3. 標題與文字效果 */
+        h1 {
+            font-size: 2.5em;
+            color: #880000; /* 血紅色的標題 */
+            text-shadow: 0 0 5px #ff0000;
+            opacity: 0; /* 初始隱藏 */
+            animation: fadeIn 3s forwards;
+            animation-delay: 1s;
+            margin-bottom: 40px;
+        }
+
+        #story-text {
+            font-size: 1.2em;
+            line-height: 1.8;
+            min-height: 100px; /* 預留空間 */
+            opacity: 0;
+            animation: fadeIn 3s forwards;
+            animation-delay: 4s;
+            text-align: left;
+            border-left: 2px solid #555;
+            padding-left: 15px;
+            color: #b0b0b0;
+        }
+
+        /* 4. 按鈕樣式 */
+        .game-button {
+            background-color: #333;
+            color: #ff3333; /* 互動按鈕是紅色的 */
+            border: 1px solid #ff3333;
+            padding: 10px 20px;
+            margin: 20px 10px;
+            cursor: pointer;
+            font-size: 1.1em;
+            opacity: 0;
+            transition: all 0.3s ease;
+            display: inline-block;
+            animation: fadeIn 3s forwards;
+            animation-delay: 7s;
+        }
+
+        .game-button:hover {
+            background-color: #550000;
+            box-shadow: 0 0 15px #ff3333;
+        }
+
+        /* 5. Jumpscare 畫面容器 */
+        #jumpscare-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: black;
+            display: none; /* 初始隱藏 */
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 1000; /* 確保在最上層 */
+            opacity: 0;
+            transition: opacity 0.05s linear;
+        }
+
+        #jumpscare-image {
+            width: 90%;
+            max-width: 1000px;
+            height: auto;
+            border: 5px solid #ff0000;
+            /* 這裡使用一個 Data URL 來嵌入一個極簡的恐怖圖片 */
+            /* 這是 'data:image/jpeg;base64,...' 的前綴，後面是實際的 base64 編碼圖片數據 */
+            /* 為了檔案單一性，我們使用一個純紅色的、有雜訊的圖片來模擬效果 */
+            content: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAoAAAAKAAQAAAAQeGzLAAACRklEQVR42u3dMW5dMRAFYPyO3/9Y+6N+C7f+Jt13W+53F7T9P3o0BwIePAEAAAAAAAAAAADg15t3W33r+yXw88zD0+f2uH203x7b/x29/L0t8PPrs/197r49D8/n75eH7+/3+frj/bX9fX9f/7y/98+73+3j/f2x//r8Xv+M3v47/jB9j7/vX3b7L/j9x/b/n343H/b1R9n/D9/8vv77H7//738n/73/3z/vD/vz
